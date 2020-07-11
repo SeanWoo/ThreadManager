@@ -14,8 +14,19 @@ namespace ThreadManagerEngine
         private List<WorkUnit> _actions = new List<WorkUnit>();
         private CancellationTokenSource cancellationToken = new CancellationTokenSource();
         private bool _isClearActions = false;
+        private int _countThreads = 100;
 
-        public int CountThreads { get; }
+        public int Frequency { get; set; } = 1;
+        public int CountThreads { 
+            get => _countThreads; 
+            set {
+                if (value > 2000)
+                    _countThreads = 2000;
+                else if (value < 1)
+                    _countThreads = 1;
+                else _countThreads = value;
+            } 
+        }
         public bool Completed { get => CountActiveThreads == 0; }
         public int CountActiveThreads
         {
@@ -27,14 +38,32 @@ namespace ThreadManagerEngine
             }
         }
 
+        /// <summary>
+        /// Base constructor. Sets the variables CountThread, Frequency to 100, 1 respectively;
+        /// </summary>
         public ThreadManager()
         {
             CountThreads = 100;
             _threads = new Thread[CountThreads];
         }
+        /// <summary>
+        /// Base constructor. Sets the Frequency variable to 1;
+        /// </summary>
+        /// <param name="countThreads">Sets the CountThreads variable.</param>
         public ThreadManager(int countThreads)
         {
             CountThreads = countThreads;
+            _threads = new Thread[CountThreads];
+        }
+        /// <summary>
+        /// Base constructor.
+        /// </summary>
+        /// <param name="countThreads">Sets the CountThreads variable.</param>
+        /// <param name="frequency">Sets the Frequency variable.</param>
+        public ThreadManager(int countThreads, int frequency)
+        {
+            CountThreads = countThreads;
+            Frequency = frequency;
             _threads = new Thread[CountThreads];
         }
 
@@ -91,6 +120,7 @@ namespace ThreadManagerEngine
                     }
                     Thread.Sleep(_sleep);
                     _sleep = int.MaxValue;
+                    Thread.Sleep(1000 / Frequency);
                 }
             });
             _delete = new Thread(() =>
@@ -108,24 +138,35 @@ namespace ThreadManagerEngine
                             i--;
                         }
                     }
-                    if (CountActiveThreads == 0)
-                    {
-                        Thread.Sleep(_sleep);
-                    }
+                    Thread.Sleep(1000 / Frequency);
                 }
             });
+            _listen.Priority = ThreadPriority.Lowest;
+            _delete.Priority = ThreadPriority.Lowest;
             _listen.IsBackground = true;
             _delete.IsBackground = true;
             _listen.Start();
             _delete.Start();
         }
 
+        /// <summary>
+        /// Clear all tasks.
+        /// </summary>
         public void Clear() => _isClearActions = true;
-
+        /// <summary>
+        /// Start Thread Manager. 
+        /// </summary>
         public async void Start() => await Task.Run(() => Listen() );
-
+        /// <summary>
+        /// Stop Thread Manager. 
+        /// </summary>
         public void Stop() => cancellationToken.Cancel();
 
+        /// <summary>
+        /// Add a new Task.
+        /// </summary>
+        /// <param name="action">Delegate. Task.</param>
+        /// <param name="loop">Repeat the task.</param>
         public void AddTask(WorkAction action, bool loop)
         {
             WorkUnit unit = new WorkUnit();

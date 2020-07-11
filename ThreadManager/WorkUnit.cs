@@ -7,11 +7,11 @@ namespace ThreadManagerEngine
     /// </summary>
     public class WorkUnit
     {
-        public bool IsWork { get; set; } = false;
-        public DateTime EndTime { get; set; } = DateTime.Now;
-        public WorkAction Action { get; set; }
-        public bool Loop { get; set; }
-        public bool Completed { get; set; }
+        internal bool IsWork { get; set; } = false;
+        internal DateTime EndTime { get; set; } = DateTime.Now;
+        internal WorkAction Action { get; set; }
+        internal bool Loop { get; set; }
+        internal bool Completed { get; set; }
 
         public void Wait(int time)
         {
