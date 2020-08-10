@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,7 +14,6 @@ namespace ThreadManagerEngine
         private Thread[] _threads;
         private List<WorkUnit> _actions = new List<WorkUnit>();
         private CancellationTokenSource cancellationToken = new CancellationTokenSource();
-        private bool _isClearActions = false;
         private int _countThreads = 100;
 
         public int Frequency { get; set; } = 1;
@@ -27,7 +27,7 @@ namespace ThreadManagerEngine
                 else _countThreads = value;
             } 
         }
-        public bool Completed { get => CountActiveThreads == 0; }
+        public bool Completed { get; private set; }
         public int CountActiveThreads
         {
             get {
@@ -69,14 +69,19 @@ namespace ThreadManagerEngine
 
         private void Listen()
         {
+            Completed = false;
+            cancellationToken = new CancellationTokenSource();
             _listen = new Thread(() =>
             {
                 while (!cancellationToken.IsCancellationRequested && _actions.Count > 0)
                 {
                     DateTime time = DateTime.Now;
+                    int countCompeleted = 0;
                     for (int i = 0; i < _actions.Count; i++)
                     {
                         var action = _actions[i];
+                        if (action.Completed) countCompeleted++;
+
                         if (((time >= action.EndTime && action.Loop) || (!action.Completed && !action.Loop)) && !action.IsWork && CountThreads > CountActiveThreads)
                         {
                             action.IsWork = true;
@@ -113,11 +118,7 @@ namespace ThreadManagerEngine
                             }
                         }
                     }
-                    if (_isClearActions)
-                    {
-                        _actions.Clear();
-                        _isClearActions = false;
-                    }
+                    Completed = countCompeleted == _actions.Count;
                     Thread.Sleep(_sleep);
                     _sleep = int.MaxValue;
                     Thread.Sleep(1000 / Frequency);
@@ -152,7 +153,7 @@ namespace ThreadManagerEngine
         /// <summary>
         /// Clear all tasks.
         /// </summary>
-        public void Clear() => _isClearActions = true;
+        public void Clear() => _actions.Clear();
         /// <summary>
         /// Start Thread Manager. 
         /// </summary>
@@ -160,7 +161,27 @@ namespace ThreadManagerEngine
         /// <summary>
         /// Stop Thread Manager. 
         /// </summary>
-        public void Stop() => cancellationToken.Cancel();
+        public void Stop()
+        {
+            Completed = true;
+            if (cancellationToken != null && !cancellationToken.IsCancellationRequested)
+            {
+                cancellationToken.Cancel();
+                cancellationToken.Dispose();
+            }
+            if (_listen != null && _delete != null)
+            {
+                _listen.Abort();
+                _delete.Abort();
+            }
+        }
+        /// <summary>
+        /// Waiting for work to finish
+        /// </summary>
+        public void Wait()
+        {
+            while (!Completed) { Thread.Sleep(100); }
+        }
 
         /// <summary>
         /// Add a new Task.
