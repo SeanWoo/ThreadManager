@@ -10,31 +10,27 @@ namespace ThreadManagerEngine
     {
         private int _sleep;
         private Thread _listen;
-        private Thread _delete;
-        private Thread[] _threads;
         private List<WorkUnit> _actions = new List<WorkUnit>();
         private CancellationTokenSource cancellationToken = new CancellationTokenSource();
         private int _countThreads = 100;
 
         public int Frequency { get; set; } = 1;
-        public int CountThreads { 
-            get => _countThreads; 
-            set {
-                if (value > 2000)
-                    _countThreads = 2000;
-                else if (value < 1)
-                    _countThreads = 1;
-                else _countThreads = value;
-            } 
+        public int CountThreads
+        {
+            get => _countThreads;
+            set
+            {
+                _countThreads = value;
+                ThreadPool.SetMinThreads(_countThreads, _countThreads);
+                ThreadPool.SetMaxThreads(_countThreads, _countThreads);
+            }
         }
         public bool Completed { get; private set; }
         public int CountActiveThreads
         {
-            get {
-                int count = 0;
-                for (int i = 0; i < _threads.Length; i++) 
-                    if (_threads[i] != null) count++;
-                return count;
+            get
+            {
+                return -1;
             }
         }
 
@@ -44,7 +40,6 @@ namespace ThreadManagerEngine
         public ThreadManager()
         {
             CountThreads = 100;
-            _threads = new Thread[CountThreads];
         }
         /// <summary>
         /// Base constructor. Sets the Frequency variable to 1;
@@ -53,7 +48,6 @@ namespace ThreadManagerEngine
         public ThreadManager(int countThreads)
         {
             CountThreads = countThreads;
-            _threads = new Thread[CountThreads];
         }
         /// <summary>
         /// Base constructor.
@@ -64,7 +58,6 @@ namespace ThreadManagerEngine
         {
             CountThreads = countThreads;
             Frequency = frequency;
-            _threads = new Thread[CountThreads];
         }
 
         private void Listen()
@@ -85,25 +78,13 @@ namespace ThreadManagerEngine
                         if (((time >= action.EndTime && action.Loop) || (!action.Completed && !action.Loop)) && !action.IsWork && CountThreads > CountActiveThreads)
                         {
                             action.IsWork = true;
-                            Thread thread = new Thread((o) =>
+                            ThreadPool.QueueUserWorkItem(o =>
                             {
                                 WorkUnit unit = (WorkUnit)o;
                                 unit.Action.Invoke(unit);
                                 unit.IsWork = false;
                                 unit.Completed = !unit.Loop;
-                            });
-                            thread.IsBackground = true;
-                            thread.Start(action);
-
-                            int threadLength = _threads.Length;
-                            for (int j = 0; j < threadLength; j++)
-                            {
-                                if (_threads[j] == null) 
-                                {
-                                    _threads[j] = thread;
-                                    break;
-                                }
-                            }
+                            }, action);
                         }
                         int subTime = (int)(action.EndTime - time).TotalMilliseconds;
                         if (subTime < _sleep)
@@ -124,30 +105,8 @@ namespace ThreadManagerEngine
                     Thread.Sleep(1000 / Frequency);
                 }
             });
-            _delete = new Thread(() =>
-            {
-                while (!cancellationToken.IsCancellationRequested && _actions.Count > 0)
-                {
-                    int threadLength = _threads.Length;
-                    for (int i = 0; i < threadLength; i++)
-                    {
-                        var thread = _threads[i];
-                        if (thread != null && !thread.IsAlive)
-                        {
-                            thread.Abort();
-                            _threads[i] = null;
-                            i--;
-                        }
-                    }
-                    Thread.Sleep(1000 / Frequency);
-                }
-            });
-            _listen.Priority = ThreadPriority.Lowest;
-            _delete.Priority = ThreadPriority.Lowest;
             _listen.IsBackground = true;
-            _delete.IsBackground = true;
             _listen.Start();
-            _delete.Start();
         }
 
         /// <summary>
@@ -157,7 +116,7 @@ namespace ThreadManagerEngine
         /// <summary>
         /// Start Thread Manager. 
         /// </summary>
-        public async void Start() => await Task.Run(() => Listen() );
+        public async void Start() => await Task.Run(() => Listen());
         /// <summary>
         /// Stop Thread Manager. 
         /// </summary>
@@ -169,10 +128,9 @@ namespace ThreadManagerEngine
                 cancellationToken.Cancel();
                 cancellationToken.Dispose();
             }
-            if (_listen != null && _delete != null)
+            if (_listen != null)
             {
                 _listen.Abort();
-                _delete.Abort();
             }
         }
         /// <summary>
