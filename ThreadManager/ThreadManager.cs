@@ -146,12 +146,13 @@ namespace ThreadManagerEngine
         /// </summary>
         /// <param name="action">Delegate. Task.</param>
         /// <param name="loop">Repeat the task.</param>
-        public void AddTask(WorkAction action, bool loop)
+        public void AddTask(WorkAction action, bool loop, object arg = null)
         {
             WorkUnit unit = new WorkUnit();
             unit.Action = action;
             unit.Loop = loop;
             unit.Completed = false;
+            unit.Argument = arg;
             _actions.Add(unit);
         }
     }

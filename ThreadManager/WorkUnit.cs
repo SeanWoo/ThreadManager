@@ -12,11 +12,17 @@ namespace ThreadManagerEngine
         internal WorkAction Action { get; set; }
         internal bool Loop { get; set; }
         internal bool Completed { get; set; }
+        internal object Argument { get; set; }
 
         public void Wait(int time)
         {
             EndTime = DateTime.Now.AddMilliseconds(time);
             IsWork = false;
+        }
+
+        public T GetArg<T>()
+        {
+            return (T)Argument;
         }
     }
 }
